@@ -14,6 +14,30 @@ from sklearn import svm
 from sklearn import metrics
 from sklearn.externals import joblib
 
+# BASE PATH DEFINITIONS
+DATA_BASE_PATH = '..'
+OUTPUT_BASE_PATH = 'dico_profile/temp/'
+
+
+#DATA PATHS
+file_MolKernel = os.path.join(DATA_BASE_PATH, "kernels/kernels.data/Tanimoto_d=8_DrugBankSmallMolMWFilterHuman.data")
+file_ProtKernel = os.path.join(DATA_BASE_PATH, "kernels/kernels.data/allDrugBankHumanTarget_Profile_normalized_k5_threshold7.5.data")
+file_DicoMolKernel_indice2 = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_indice2mol_InMolKernel.data")
+file_DicoMolKernel_2indice = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_mol2indice_InMolKernel.data")
+file_DicoProtKernel_indice2 = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_indice2prot_InProtKernel.data")
+file_DicoProtKernel_2indice = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_prot2indice_InProtKernel.data")
+
+file_PosDic = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/SmallMolMWFilter_UniprotHumanProt_DrugBank_Dictionary.csv")
+file_NegDic = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_test_for_prot.csv")
+file_NegDic_balanced = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_balanced_for_prot.csv")
+
+file_ProtList = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/list_MWFilter_UniprotHumanProt.txt")
+file_MolList = os.path.join(DATA_BASE_PATH,"dictionnaries_and_lists/list_MWFilter_mol.txt")
+
+
+############################################################################
+############################################################################
+############################################################################
 
 
 def make_list_labels(dico_indice2mol_InMolKernel, list_ligand_of_prot):
@@ -89,24 +113,7 @@ def mix_true_in_pred(true_profile, pred_profile, score_profile, list_C):
 	
 	return TrueAndPred_profile, TrueAndScore_profile
 
-############################################################################
-############################################################################
-############################################################################
 
-
-file_MolKernel = "../kernels/kernels.data/Tanimoto_d=8_DrugBankSmallMolMWFilterHuman.data"
-file_ProtKernel = "../kernels/kernels.data/allDrugBankHumanTarget_Profile_normalized_k5_threshold7.5.data"
-file_DicoMolKernel_indice2 = "../kernels/dict/dico_indice2mol_InMolKernel.data"
-file_DicoMolKernel_2indice = "../kernels/dict/dico_mol2indice_InMolKernel.data"
-file_DicoProtKernel_indice2 = "../kernels/dict/dico_indice2prot_InProtKernel.data"
-file_DicoProtKernel_2indice = "../kernels/dict/dico_prot2indice_InProtKernel.data"
-
-file_PosDic = "../dictionnaries_and_lists/SmallMolMWFilter_UniprotHumanProt_DrugBank_Dictionary.csv"
-file_NegDic = "../dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_test_for_prot.csv"
-file_NegDic_balanced = "../dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_balanced_for_prot.csv"
-
-file_ProtList = "../dictionnaries_and_lists/list_MWFilter_UniprotHumanProt.txt"
-file_MolList = "../dictionnaries_and_lists/list_MWFilter_mol.txt"
 
 
 #### instances
@@ -230,19 +237,21 @@ for prot in list_prot_of_dataset:
 ############################################################################
 ############################################################################
 
-with open("dico_profile/temp/dico_pred_profile_per_prot_"+sys.argv[1]+".data", 'wb') as fichier:
+
+
+with open(os.path.join(OUTPUT_BASE_PATH, "dico_pred_profile_per_prot_"+sys.argv[1]+".data"), 'wb') as fichier:
 	pickler = pickle.Pickler(fichier)
 	pickler.dump(dico_pred_profile_per_prot)
-with open("dico_profile/temp/dico_score_profile_per_prot_"+sys.argv[1]+".data", 'wb') as fichier:
+with open(os.path.join(OUTPUT_BASE_PATH, "dico_score_profile_per_prot_"+sys.argv[1]+".data"), 'wb') as fichier:
 	pickler = pickle.Pickler(fichier)
 	pickler.dump(dico_score_profile_per_prot)
-with open("dico_profile/temp/dico_true_profile_per_prot_"+sys.argv[1]+".data", 'wb') as fichier:
+with open(os.path.join(OUTPUT_BASE_PATH, "dico_true_profile_per_prot_"+sys.argv[1]+".data"), 'wb') as fichier:
 	pickler = pickle.Pickler(fichier)
 	pickler.dump(dico_true_profile_per_prot)
-with open("dico_profile/temp/dico_TrueAndPred_profile_per_prot_"+sys.argv[1]+".data", 'wb') as fichier:
+with open(os.path.join(OUTPUT_BASE_PATH, "dico_TrueAndPred_profile_per_prot_"+sys.argv[1]+".data"), 'wb') as fichier:
 	pickler = pickle.Pickler(fichier)
 	pickler.dump(dico_TrueAndPred_profile_per_prot)
-with open("dico_profile/temp/dico_TrueAndScore_profile_per_prot_"+sys.argv[1]+".data", 'wb') as fichier:
+with open(os.path.join(OUTPUT_BASE_PATH, "dico_TrueAndScore_profile_per_prot_"+sys.argv[1]+".data"), 'wb') as fichier:
 	pickler = pickle.Pickler(fichier)
 	pickler.dump(dico_TrueAndScore_profile_per_prot)
 	

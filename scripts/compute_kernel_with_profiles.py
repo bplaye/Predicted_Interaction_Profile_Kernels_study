@@ -26,21 +26,21 @@ from sklearn.externals import joblib
 ############################################################################
 ############################################################################
 ############################################################################
+DATA_BASE_PATH = '..'
 
+file_MolKernel = os.path.join(DATA_BASE_PATH, "kernels/kernels.data/Tanimoto_d=8_DrugBankSmallMolMWFilterHuman.data")
+file_ProtKernel = os.path.join(DATA_BASE_PATH, "kernels/kernels.data/allDrugBankHumanTarget_Profile_normalized_k5_threshold7.5.data")
+file_DicoMolKernel_indice2 = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_indice2mol_InMolKernel.data")
+file_DicoMolKernel_2indice = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_mol2indice_InMolKernel.data")
+file_DicoProtKernel_indice2 = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_indice2prot_InProtKernel.data")
+file_DicoProtKernel_2indice = os.path.join(DATA_BASE_PATH, "kernels/dict/dico_prot2indice_InProtKernel.data")
 
-file_MolKernel = "../kernels/kernels.data/Tanimoto_d=8_DrugBankSmallMolMWFilterHuman.data"
-file_ProtKernel = "../kernels/kernels.data/allDrugBankHumanTarget_Profile_normalized_k5_threshold7.5.data"
-file_DicoMolKernel_indice2 = "../kernels/dict/dico_indice2mol_InMolKernel.data"
-file_DicoMolKernel_2indice = "../kernels/dict/dico_mol2indice_InMolKernel.data"
-file_DicoProtKernel_indice2 = "../kernels/dict/dico_indice2prot_InProtKernel.data"
-file_DicoProtKernel_2indice = "../kernels/dict/dico_prot2indice_InProtKernel.data"
+file_PosDic = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/SmallMolMWFilter_UniprotHumanProt_DrugBank_Dictionary.csv")
+file_NegDic = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_test_for_prot.csv")
+file_NegDic_balanced = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_balanced_for_prot.csv")
 
-file_PosDic = "../dictionnaries_and_lists/SmallMolMWFilter_UniprotHumanProt_DrugBank_Dictionary.csv"
-file_NegDic = "../dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_test_for_prot.csv"
-file_NegDic_balanced = "../dictionnaries_and_lists/bootstrapped:NegDictionnaries/SmallMolMWFilter_UniprotHumanProt_DrugBank_Bootstraped_NegDictionary_for_balanced_for_prot.csv"
-
-file_ProtList = "../dictionnaries_and_lists/list_MWFilter_UniprotHumanProt.txt"
-file_MolList = "../dictionnaries_and_lists/list_MWFilter_mol.txt"
+file_ProtList = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/list_MWFilter_UniprotHumanProt.txt")
+file_MolList = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/list_MWFilter_mol.txt")
 
 
 #### instances
