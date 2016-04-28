@@ -8,6 +8,7 @@ import pickle
 DATA_BASE_PATH = '.'
 OUTPUT_BASE_PATH = '.'
 
+
 default_FileName_PositiveInstancesDictionnary = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/SmallMolMWFilter_UniprotHumanProt_DrugBank_Dictionary.csv")
 default_FileName_ListProt = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/list_MWFilter_UniprotHumanProt.txt")
 default_FileName_ListMol = os.path.join(DATA_BASE_PATH, "dictionnaries_and_lists/list_MWFilter_mol.txt")
