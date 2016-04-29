@@ -12,93 +12,96 @@ from scripts.load_dataset import load_dataset
 
 
 def get_files_paths(base_path):
-
-	FileName_PositiveInstancesDictionnary = os.path.join(
+	filename_positive_instances_dictionnary = os.path.join(
 		base_path, "dictionnaries_and_lists/SmallMolMWFilter_UniprotHumanProt_DrugBank_Dictionary.csv"
 	)
 
-	FileName_ListProt = os.path.join(base_path, "dictionnaries_and_lists/list_MWFilter_UniprotHumanProt.txt")
-	FileName_ListMol = os.path.join(base_path, "dictionnaries_and_lists/list_MWFilter_mol.txt")
+	filename_list_prot = os.path.join(base_path, "dictionnaries_and_lists/list_MWFilter_UniprotHumanProt.txt")
+	filename_list_mol = os.path.join(base_path, "dictionnaries_and_lists/list_MWFilter_mol.txt")
 
-	FileName_MolKernel = os.path.join(base_path, "kernels/kernels.data/Tanimoto_d=8_DrugBankSmallMolMWFilterHuman.data")
-	FileName_DicoMolKernel_indice2instance = os.path.join(base_path, "kernels/dict/dico_indice2mol_InMolKernel.data")
-	FileName_DicoMolKernel_instance2indice = os.path.join(base_path, "kernels/dict/dico_mol2indice_InMolKernel.data")
+	filename_mol_kernel = os.path.join(
+		base_path,
+		"kernels/kernels.data/Tanimoto_d=8_DrugBankSmallMolMWFilterHuman.data"
+	)
+	filename_dicomolkernel_indice2instance = os.path.join(base_path, "kernels/dict/dico_indice2mol_InMolKernel.data")
+	filename_dicomolkernel_instance2indice = os.path.join(base_path, "kernels/dict/dico_mol2indice_InMolKernel.data")
 
-	return FileName_PositiveInstancesDictionnary, FileName_ListProt, FileName_ListMol, FileName_MolKernel, \
-	       FileName_DicoMolKernel_indice2instance, FileName_DicoMolKernel_instance2indice
+	return filename_positive_instances_dictionnary, filename_list_prot, filename_list_mol, filename_mol_kernel, \
+		filename_dicomolkernel_indice2instance, filename_dicomolkernel_instance2indice
 
 
 def calculate_disimilarity(x, y):
-	N, P = x.shape
-	_, T = y.shape
+	n, p = x.shape
+	_, n_tasks = y.shape
 
-	train, test = train_test_split(np.arange(N), test_size=0.1, )
-	models = [SVC(kernel='precomputed') for task in range(T)]
-	x_tr = x[train, :][:,train]
-	x_te = x[test, :][:,train]
+	train, test = train_test_split(np.arange(n), test_size=0.1, )
+	models = [SVC(kernel='precomputed') for _ in range(n_tasks)]
+	x_tr = x[train, :][:, train]
+	x_te = x[test, :][:, train]
 	y_tr = y[train, :]
-	y_te = y[test,:]
-	#train one model for each task
-	for t in range(T):
+	y_te = y[test, :]
+	# train one model for each task
+	for t in range(n_tasks):
 		models[t].fit(x_tr, y_tr[:, t])
 
-	disimilarities = np.zeros((T, T))
-	for t_1 in range(T):
-		for t_2 in range(t_1, T):
+	disimilarity_matrix = np.zeros((n_tasks, n_tasks))
+	for t_1 in range(n_tasks):
+		for t_2 in range(t_1, n_tasks):
 			loss_differences = []
-			for m_1 in range(T):
-				prediction = models[m_1].predict(x_te).flatten()
-				per1 = zero_one_loss(prediction, y_te[:,t_1].flatten())
-				per2 = zero_one_loss(prediction, y_te[:,t_2].flatten())
-				loss_differences.append(np.abs(per1-per2))
+			for m_1 in range(n_tasks):
+				pred = models[m_1].predict(x_te).flatten()
+				per1 = zero_one_loss(pred, y_te[:, t_1].flatten())
+				per2 = zero_one_loss(pred, y_te[:, t_2].flatten())
+				loss_differences.append(np.abs(per1 - per2))
 
-			disimilarities[t_1,t_2] = np.max(loss_differences)
-			disimilarities[t_2,t_1] = disimilarities[t_1,t_2]
+			disimilarity_matrix[t_1, t_2] = np.max(loss_differences)
+			disimilarity_matrix[t_2, t_1] = disimilarity_matrix[t_1, t_2]
 
-	return disimilarities
+	return disimilarity_matrix
 
-def make_prediction(x_tr, y_tr, x_te, disimilarities):
-	#Calculate task kernel
-	task_kernel = rbf_kernel(disimilarities)
-	#Train the model
+
+def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix):
+	# Calculate task kernel
+	task_kernel = rbf_kernel(disimilarity_matrix)
+	# Train the model
 	multitask_kernel_tr = np.kron(x_tr, task_kernel)
 	model = SVC(kernel='precomputed', probability=True)
 	model.fit(multitask_kernel_tr, y_tr.flatten())
-	#Predict
+	# Predict
 	multitask_kernel_te = np.kron(x_te, task_kernel)
-	prediction =  model.predict(multitask_kernel_te)
-	#Reshape the matrix as (n_te, T) array.
-	return prediction.reshape((x_te.shape[0], y_tr.shape[1])) , model
+	y_pred = model.predict(multitask_kernel_te)
+	# Reshape the matrix as (n_te, T) array.
+	return y_pred.reshape((x_te.shape[0], y_tr.shape[1])), model
+
 
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='Process some integers.')
-	parser.add_argument('-p', '--path', nargs='?', default='.', type=str, dest='base_path')
+	parser.add_argument('-p', '--path', nargs='?', default='.', type=str, dest='base_data_path')
 	parser.add_argument('-o', '--out', nargs='?', default='results.pickle', type=str, dest='output_filename')
 
 	args = parser.parse_args()
-	base_path = args.base_path
+	base_data_path = args.base_data_path
 	output_filename = args.output_filename
 
-	files_paths = get_files_paths(base_path)
+	files_paths = get_files_paths(base_data_path)
 	K_mol, DicoMolKernel_ind2mol, DicoMolKernel_mol2ind, interaction_matrix = load_dataset(files_paths)
 	predictions = []
 	final_models = []
 	folds = []
 	for tr_idx, te_idx in KFold(KFold.shape[0], n_folds=10):
-		folds.append((tr_idx,te_idx))
+		folds.append((tr_idx, te_idx))
 
-		x_tr = K_mol[tr_idx, :][:, tr_idx]
-		x_te = K_mol[te_idx, :][:, tr_idx]
-		y_tr = interaction_matrix[tr_idx, :]
-		y_te = interaction_matrix[te_idx, :]
-		disimilarities = calculate_disimilarity(x_tr, y_tr)
+		x_training = K_mol[tr_idx, :][:, tr_idx]
+		x_testing = K_mol[te_idx, :][:, tr_idx]
+		y_training = interaction_matrix[tr_idx, :]
+		y_testing = interaction_matrix[te_idx, :]
+		disimilarities = calculate_disimilarity(x_training, y_training)
 
-		prediction, model = make_prediction(x_tr, y_tr, x_te, disimilarities )
+		prediction, final_model = make_prediction(x_training, y_training, x_testing, disimilarities)
 
-		predictions.append((prediction,y_te))
-		final_models.append(model)
-
+		predictions.append((prediction, y_testing))
+		final_models.append(final_model)
 
 	results = {
 		'predictions': predictions,
