@@ -12,6 +12,13 @@ from scripts.load_dataset import load_dataset
 
 
 def get_files_paths(base_path):
+	'''
+	Recieve the base directory path and returns de paht to all the data files.
+	:param base_path: base path to the data root folder
+	:return: Returns 6 files paht to the different files. The matrix of positives instances, a list of proteins, a list
+		of molecules, a kernel of molecules similarities, a dictionary for molecules to indices in the kernel,
+		and the corresponding dictionary for indices to molecules.
+	'''
 	filename_positive_instances_dictionnary = os.path.join(
 		base_path, "dictionnaries_and_lists/SmallMolMWFilter_UniprotHumanProt_DrugBank_Dictionary.csv"
 	)
@@ -27,14 +34,21 @@ def get_files_paths(base_path):
 	filename_dicomolkernel_instance2indice = os.path.join(base_path, "kernels/dict/dico_mol2indice_InMolKernel.data")
 
 	return filename_positive_instances_dictionnary, filename_list_prot, filename_list_mol, filename_mol_kernel, \
-		filename_dicomolkernel_indice2instance, filename_dicomolkernel_instance2indice
+	       filename_dicomolkernel_indice2instance, filename_dicomolkernel_instance2indice
 
 
-def calculate_disimilarity(x, y):
+def calculate_disimilarity(x, y, test_size=0.1):
+	'''
+	Calculate a disimilarity matrix between the different tasks.
+	:param x: An arrray containing the kernel for the instances.
+	:param y: a matrix containing the target value for each x in the rows, and the task in the columns.
+	:param test_size: A float containing the proportion of test dataset to be used.
+	:return: A n_task by n_task matrix containing.
+	'''
 	n, p = x.shape
 	_, n_tasks = y.shape
 
-	train, test = train_test_split(np.arange(n), test_size=0.1, )
+	train, test = train_test_split(np.arange(n), test_size=test_size, )
 	models = [SVC(kernel='precomputed') for _ in range(n_tasks)]
 	x_tr = x[train, :][:, train]
 	x_te = x[test, :][:, train]
@@ -61,6 +75,14 @@ def calculate_disimilarity(x, y):
 
 
 def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix):
+	'''
+	Trains a model according to the disimilarity between the task.
+	:param x_tr: A kernel for the training data.
+	:param y_tr: The training targets.
+	:param x_te: The corresponding kernel for prediction.
+	:param disimilarity_matrix: The disimilarity matrix between the tasks.
+	:return: Return an array containing the predictions, and the final models.
+	'''
 	# Calculate task kernel
 	task_kernel = rbf_kernel(disimilarity_matrix)
 	# Train the model
@@ -88,6 +110,7 @@ if __name__ == '__main__':
 	K_mol, DicoMolKernel_ind2mol, DicoMolKernel_mol2ind, interaction_matrix = load_dataset(files_paths)
 	predictions = []
 	final_models = []
+	disimilarity_list = []
 	folds = []
 	for tr_idx, te_idx in KFold(KFold.shape[0], n_folds=10):
 		folds.append((tr_idx, te_idx))
@@ -97,7 +120,7 @@ if __name__ == '__main__':
 		y_training = interaction_matrix[tr_idx, :]
 		y_testing = interaction_matrix[te_idx, :]
 		disimilarities = calculate_disimilarity(x_training, y_training)
-
+		disimilarity_list.append(disimilarities)
 		prediction, final_model = make_prediction(x_training, y_training, x_testing, disimilarities)
 
 		predictions.append((prediction, y_testing))
@@ -106,7 +129,8 @@ if __name__ == '__main__':
 	results = {
 		'predictions': predictions,
 		'models': final_models,
-		'folds': folds
+		'folds': folds,
+		'disimilarity': disimilarity_list,
 	}
 
 	with open(output_filename, 'w') as f:
