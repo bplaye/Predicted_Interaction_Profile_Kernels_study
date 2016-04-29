@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pickle
+import argparse
 
 from sklearn.cross_validation import train_test_split, KFold
 from sklearn.svm import SVC
@@ -70,7 +71,15 @@ def make_prediction(x_tr, y_tr, x_te, disimilarities):
 	return prediction.reshape((x_te.shape[0], y_tr.shape[1])) , model
 
 if __name__ == '__main__':
-	base_path = '.'
+
+	parser = argparse.ArgumentParser(description='Process some integers.')
+	parser.add_argument('-p', '--path', nargs='?', default='.', type=str, dest='base_path')
+	parser.add_argument('-o', '--out', nargs='?', default='results.pickle', type=str, dest='output_filename')
+
+	args = parser.parse_args()
+	base_path = args.base_path
+	output_filename = args.output_filename
+
 	files_paths = get_files_paths(base_path)
 	K_mol, DicoMolKernel_ind2mol, DicoMolKernel_mol2ind, interaction_matrix = load_dataset(files_paths)
 	predictions = []
@@ -96,5 +105,6 @@ if __name__ == '__main__':
 		'models': final_models,
 		'folds': folds
 	}
-	with open('outputfile.pickle', 'w') as f:
+
+	with open(output_filename, 'w') as f:
 		pickle.dump(results, f)
