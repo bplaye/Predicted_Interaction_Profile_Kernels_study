@@ -6,7 +6,7 @@ import argparse
 from sklearn.cross_validation import train_test_split, KFold, LeaveOneOut
 from sklearn.svm import SVC
 from sklearn.metrics import zero_one_loss
-from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.metrics.pairwise import linear_kernel
 
 from load_dataset import load_dataset
 
@@ -49,22 +49,34 @@ def calculate_disimilarity(x, y, test_size=0.1):
 	n, p = x.shape
 	_, n_tasks = y.shape
 
-	train, test = train_test_split(np.arange(n), test_size=test_size, )
-	models = [SVC(kernel='precomputed') for _ in range(n_tasks)]
-	x_tr = x[train, :][:, train]
-	x_te = x[test, :][:, train]
-	y_tr = y[train, :]
-	y_te = y[test, :]
+	for train, test in LeaveOneOut(x.shape[0]):
+		models = []
+		x_tr = x[train, :][:, train]
+		x_te = x[test, :][:, train]
+		y_tr = y[train, :]
+		y_te = y[test, :]
+
 	# train one model for each task
 	for t in range(n_tasks):
-		models[t].fit(x_tr, y_tr[:, t])
+		y_tr_task = y_tr[:, t]
+		if np.unique(y_tr_task).size == 1:
+			continue
+		index = np.arange(y_tr_task.size)
+		selected = y_tr_task == 1
+		id_neg= np.random.choice(index[not selected], size=np.sum(selected), replace=False)
+		selected[id_neg] = True
+
+		model = SVC(kernel='precomputed',)
+
+		model.fit(x_tr[selected,:][:,selected], y_tr_task[selected])
+		models.append(model)
 
 	disimilarity_matrix = np.zeros((n_tasks, n_tasks))
 	for t_1 in range(n_tasks):
 		for t_2 in range(t_1, n_tasks):
 			loss_differences = []
-			for m_1 in range(n_tasks):
-				pred = models[m_1].predict(x_te).flatten()
+			for model in models:
+				pred = model.predict(x_te).flatten()
 				per1 = zero_one_loss(pred, y_te[:, t_1].flatten())
 				per2 = zero_one_loss(pred, y_te[:, t_2].flatten())
 				loss_differences.append(np.abs(per1 - per2))
@@ -85,14 +97,23 @@ def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix):
 	:return: Return an array containing the predictions, and the final models.
 	'''
 	# Calculate task kernel
-	task_kernel = rbf_kernel(disimilarity_matrix)
+	task_kernel = linear_kernel(disimilarity_matrix)
 	# Train the model
 	multitask_kernel_tr = np.kron(x_tr, task_kernel)
 	model = SVC(kernel='precomputed', probability=True)
-	model.fit(multitask_kernel_tr, y_tr.flatten())
+
+	final_y_tr = y_tr.flatten()
+
+	index = np.arange(final_y_tr.size)
+	selected = final_y_tr == 1
+	id_neg = np.random.choice(index[not selected], size=np.sum(selected), replace=False)
+	selected[id_neg] = True
+
+
+	model.fit(multitask_kernel_tr[selected,:][:,selected], y_tr.flatten()[selected])
 	# Predict
 	multitask_kernel_te = np.kron(x_te, task_kernel)
-	y_pred = model.predict(multitask_kernel_te)
+	y_pred = model.predict(multitask_kernel_te[:, selected])
 	# Reshape the matrix as (n_te, T) array.
 	return y_pred.reshape((x_te.shape[0], y_tr.shape[1])), model
 
