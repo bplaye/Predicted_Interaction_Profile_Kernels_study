@@ -3,12 +3,12 @@ import numpy as np
 import pickle
 import argparse
 
-from sklearn.cross_validation import train_test_split, KFold
+from sklearn.cross_validation import train_test_split, KFold, LeaveOneOut
 from sklearn.svm import SVC
 from sklearn.metrics import zero_one_loss
 from sklearn.metrics.pairwise import rbf_kernel
 
-from scripts.load_dataset import load_dataset
+from load_dataset import load_dataset
 
 
 def get_files_paths(base_path):
@@ -33,6 +33,7 @@ def get_files_paths(base_path):
 	filename_dicomolkernel_indice2instance = os.path.join(base_path, "kernels/dict/dico_indice2mol_InMolKernel.data")
 	filename_dicomolkernel_instance2indice = os.path.join(base_path, "kernels/dict/dico_mol2indice_InMolKernel.data")
 
+	print(filename_mol_kernel)
 	return filename_positive_instances_dictionnary, filename_list_prot, filename_list_mol, filename_mol_kernel, \
 	       filename_dicomolkernel_indice2instance, filename_dicomolkernel_instance2indice
 
@@ -99,20 +100,24 @@ def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix):
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='Process some integers.')
-	parser.add_argument('-p', '--path', nargs='?', default='.', type=str, dest='base_data_path')
+	parser.add_argument('-p', '--path', nargs='?', default='.', type=str, dest='base_data_path', action='store')
 	parser.add_argument('-o', '--out', nargs='?', default='results.pickle', type=str, dest='output_filename')
 
 	args = parser.parse_args()
+
+	print(args)
+
 	base_data_path = args.base_data_path
 	output_filename = args.output_filename
 
 	files_paths = get_files_paths(base_data_path)
-	K_mol, DicoMolKernel_ind2mol, DicoMolKernel_mol2ind, interaction_matrix = load_dataset(files_paths)
+	K_mol, DicoMolKernel_ind2mol, DicoMolKernel_mol2ind, interaction_matrix = load_dataset(*files_paths)
+
 	predictions = []
 	final_models = []
 	disimilarity_list = []
 	folds = []
-	for tr_idx, te_idx in KFold(KFold.shape[0], n_folds=10):
+	for tr_idx, te_idx in LeaveOneOut(K_mol.shape[0]):
 		folds.append((tr_idx, te_idx))
 
 		x_training = K_mol[tr_idx, :][:, tr_idx]
