@@ -163,7 +163,8 @@ if __name__ == '__main__':
 	base_data_path = args.base_data_path
 	output_filename = args.output_filename
 	leaveout = args.leaveout
-
+	if os.path.isfile(output_filename):
+		sys.exit(0)
 	files_paths = get_files_paths(base_data_path)
 	K_mol, _, _, interaction_matrix = load_dataset(*files_paths)
 
