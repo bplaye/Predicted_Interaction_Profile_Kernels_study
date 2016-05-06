@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pickle
 import argparse
+import sys
 
 from sklearn.cross_validation import train_test_split, KFold, LeaveOneOut
 from sklearn.svm import SVC
@@ -38,7 +39,7 @@ def get_files_paths(base_path):
 	       filename_dicomolkernel_indice2instance, filename_dicomolkernel_instance2indice
 
 
-def calculate_disimilarity(x, y, test_size=0.1):
+def calculate_disimilarity(x, y, printed, test_size=0.1, ):
 	'''
 	Calculate a disimilarity matrix between the different tasks.
 	:param x: An arrray containing the kernel for the instances.
@@ -46,48 +47,64 @@ def calculate_disimilarity(x, y, test_size=0.1):
 	:param test_size: A float containing the proportion of test dataset to be used.
 	:return: A n_task by n_task matrix containing.
 	'''
-	n, p = x.shape
+	n, _ = x.shape
 	_, n_tasks = y.shape
 
-	for train, test in LeaveOneOut(x.shape[0]):
-		models = []
-		x_tr = x[train, :][:, train]
-		x_te = x[test, :][:, train]
-		y_tr = y[train, :]
-		y_te = y[test, :]
+	train, test = train_test_split(np.arange(n), test_size=test_size)
+	models = []
+	preds = []
+	selected_indices = []
+	x_tr = x[train, :][:, train]
+	x_te = x[test, :][:, train]
+	y_tr = y[train, :]
+	y_te = y[test, :]
 
 	# train one model for each task
 	for t in range(n_tasks):
+		print('Dissimilarity {}: train_model: {}/{}'.format(printed, t + 1, n_tasks))
+		sys.stdout.flush()
+
 		y_tr_task = y_tr[:, t]
 		if np.unique(y_tr_task).size == 1:
 			continue
 		index = np.arange(y_tr_task.size)
 		selected = y_tr_task == 1
-		id_neg= np.random.choice(index[not selected], size=np.sum(selected), replace=False)
+		id_neg = np.random.choice(index[y_tr_task != 1], size=np.sum(selected), replace=False)
 		selected[id_neg] = True
+		selected_indices.append(selected)
+		model = SVC(kernel='precomputed', )
 
-		model = SVC(kernel='precomputed',)
-
-		model.fit(x_tr[selected,:][:,selected], y_tr_task[selected])
+		model.fit(x_tr[selected, :][:, selected], y_tr_task[selected])
+		pred = model.predict(x_te[:, selected]).flatten()
+		preds.append(pred)
 		models.append(model)
 
-	disimilarity_matrix = np.zeros((n_tasks, n_tasks))
-	for t_1 in range(n_tasks):
-		for t_2 in range(t_1, n_tasks):
-			loss_differences = []
-			for model in models:
-				pred = model.predict(x_te).flatten()
-				per1 = zero_one_loss(pred, y_te[:, t_1].flatten())
-				per2 = zero_one_loss(pred, y_te[:, t_2].flatten())
-				loss_differences.append(np.abs(per1 - per2))
+	# Create an array of the predictions, with each prediction in a column
+	preds = np.array(preds).T
+	# calculate losses by calculaten the difference between each prediction and eact task target array
+	losses = np.mean((preds[:, None, :] == y_te[:, :, None]).astype(np.float32), axis=0)
+	# Calculate the distances betweeen losses from the same task and calculate the maximum for each task
+	disimilarity_matrix = np.max(np.abs(losses[None, :, :] - losses[:, None, :]), axis=2)
 
-			disimilarity_matrix[t_1, t_2] = np.max(loss_differences)
-			disimilarity_matrix[t_2, t_1] = disimilarity_matrix[t_1, t_2]
+	# for t_1 in range(n_tasks):
+	# 	for t_2 in range(t_1, n_tasks):
+	# 		print('Dissimilarity {}: fill dissimilaries: {},{}/{}'.format(printed, t_1, t_2, n_tasks))
+	# 		sys.stdout.flush()
+	#
+	# 		loss_differences = []
+	# 		for i, _ in enumerate(models):
+	# 			per1 = zero_one_loss(preds[i]
+	# 			                     , y_te[:, t_1].flatten())
+	# 			per2 = zero_one_loss(preds[i], y_te[:, t_2].flatten())
+	# 			loss_differences.append(np.abs(per1 - per2))
+	#
+	# 		disimilarity_matrix[t_1, t_2] = np.max(loss_differences)
+	# 		disimilarity_matrix[t_2, t_1] = disimilarity_matrix[t_1, t_2]
 
 	return disimilarity_matrix
 
 
-def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix):
+def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix, leaveout):
 	'''
 	Trains a model according to the disimilarity between the task.
 	:param x_tr: A kernel for the training data.
@@ -97,67 +114,77 @@ def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix):
 	:return: Return an array containing the predictions, and the final models.
 	'''
 	# Calculate task kernel
+	print("Training Task Kernek {}".format(leaveout))
+	sys.stdout.flush()
 	task_kernel = linear_kernel(disimilarity_matrix)
+	sys.stdout.flush()
+	print("Finished Task Kernek {}".format(leaveout))
 	# Train the model
-	multitask_kernel_tr = np.kron(x_tr, task_kernel)
+
+	non_zero = np.argwhere(y_tr == 1)
+	zero = np.argwhere(y_tr != 1)
+	zero = zero[np.random.choice(np.arange(zero.shape[0]), size=non_zero.shape[0]), :]
+	selected = np.concatenate((non_zero, zero), axis=0)
+	final_y_tr = np.array([y_tr[i, j] for i, j in selected])
+
+	print("Creating Multitask Matrix {}".format(leaveout))
+	sys.stdout.flush()
+	multitask_kernel_tr = np.zeros((selected.shape[0], selected.shape[0]), dtype=np.float32)
+	print("Filling Multitask Matrix {}".format(leaveout))
+	sys.stdout.flush()
+	multitask_kernel_tr = x_tr[selected[:, 0], :][:, selected[:, 0]] * task_kernel[selected[:, 1], :][:, selected[:, 1]]
+	print("Test MultiTask Kernel {}".format(leaveout))
+	sys.stdout.flush()
+	multitask_kernel_te = np.tile(x_te[:, selected[:, 0]], (task_kernel.shape[1], 1)) * \
+	                      np.repeat(task_kernel[:, selected[:, 1]], x_te.shape[0], axis=0)
+
+	print("Training SVM {}".format(leaveout))
+	sys.stdout.flush()
 	model = SVC(kernel='precomputed', probability=True)
-
-	final_y_tr = y_tr.flatten()
-
-	index = np.arange(final_y_tr.size)
-	selected = final_y_tr == 1
-	id_neg = np.random.choice(index[not selected], size=np.sum(selected), replace=False)
-	selected[id_neg] = True
-
-
-	model.fit(multitask_kernel_tr[selected,:][:,selected], y_tr.flatten()[selected])
+	model.fit(multitask_kernel_tr, final_y_tr)
 	# Predict
-	multitask_kernel_te = np.kron(x_te, task_kernel)
-	y_pred = model.predict(multitask_kernel_te[:, selected])
+	print("Predicting SVM {}".format(leaveout))
+	sys.stdout.flush()
+
+	y_pred = model.predict(multitask_kernel_te)
 	# Reshape the matrix as (n_te, T) array.
 	return y_pred.reshape((x_te.shape[0], y_tr.shape[1])), model
 
 
 if __name__ == '__main__':
-
 	parser = argparse.ArgumentParser(description='Process some integers.')
 	parser.add_argument('-p', '--path', nargs='?', default='.', type=str, dest='base_data_path', action='store')
 	parser.add_argument('-o', '--out', nargs='?', default='results.pickle', type=str, dest='output_filename')
-
+	parser.add_argument('-l', '--leaveoneout', nargs='?', default=None, type=int, dest='leaveout')
 	args = parser.parse_args()
 
 	print(args)
 
 	base_data_path = args.base_data_path
 	output_filename = args.output_filename
+	leaveout = args.leaveout
 
 	files_paths = get_files_paths(base_data_path)
-	K_mol, DicoMolKernel_ind2mol, DicoMolKernel_mol2ind, interaction_matrix = load_dataset(*files_paths)
+	K_mol, _, _, interaction_matrix = load_dataset(*files_paths)
 
-	predictions = []
-	final_models = []
-	disimilarity_list = []
-	folds = []
-	for tr_idx, te_idx in LeaveOneOut(K_mol.shape[0]):
-		folds.append((tr_idx, te_idx))
+	tr_idx = np.ones(K_mol.shape[0], dtype=bool)
+	tr_idx[leaveout] = False
+	te_idx = np.zeros(K_mol.shape[0], dtype=bool)
+	te_idx[leaveout] = True
 
-		x_training = K_mol[tr_idx, :][:, tr_idx]
-		x_testing = K_mol[te_idx, :][:, tr_idx]
-		y_training = interaction_matrix[tr_idx, :]
-		y_testing = interaction_matrix[te_idx, :]
-		disimilarities = calculate_disimilarity(x_training, y_training)
-		disimilarity_list.append(disimilarities)
-		prediction, final_model = make_prediction(x_training, y_training, x_testing, disimilarities)
-
-		predictions.append((prediction, y_testing))
-		final_models.append(final_model)
+	x_training = K_mol[tr_idx, :][:, tr_idx]
+	x_testing = K_mol[te_idx, :][:, tr_idx]
+	y_training = interaction_matrix[tr_idx, :]
+	y_testing = interaction_matrix[te_idx, :]
+	disimilarities = calculate_disimilarity(x_training, y_training, leaveout)
+	prediction, final_model = make_prediction(x_training, y_training, x_testing, disimilarities, leaveout)
 
 	results = {
-		'predictions': predictions,
-		'models': final_models,
-		'folds': folds,
-		'disimilarity': disimilarity_list,
+		'prediction': (prediction, y_testing),
+		'model': final_model,
+		'fold': (tr_idx, te_idx),
+		'disimilarity': disimilarities,
 	}
 
-	with open(output_filename, 'w') as f:
+	with open(output_filename, 'wb') as f:
 		pickle.dump(results, f)

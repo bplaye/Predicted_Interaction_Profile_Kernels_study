@@ -41,7 +41,7 @@ def load_dataset(FileName_PositiveInstancesDictionnary=default_FileName_Positive
 	##loading molecule kernel and its associated dictionnaries
 	with open(FileName_MolKernel, 'rb') as fichier:
 		pickler = pickle.Unpickler(fichier)
-		K_mol = pickler.load()
+		K_mol = pickler.load().astype(np.float32)
 	with open(FileName_DicoMolKernel_indice2instance, 'rb') as fichier:
 		pickler = pickle.Unpickler(fichier)
 		DicoMolKernel_ind2mol = pickler.load()
@@ -79,7 +79,7 @@ def load_dataset(FileName_PositiveInstancesDictionnary=default_FileName_Positive
 	f_in.close()
 	
 	##making interaction_matrix
-	interaction_matrix = np.zeros((len(list_mol_of_dataset), len(list_prot_of_dataset)))
+	interaction_matrix = np.zeros((len(list_mol_of_dataset), len(list_prot_of_dataset)), dtype=np.float32)
 	for i in range(len(list_mol_of_dataset)):
 		list_of_targets = dico_targets_per_mol[list_mol_of_dataset[i]]
 		nb=0
