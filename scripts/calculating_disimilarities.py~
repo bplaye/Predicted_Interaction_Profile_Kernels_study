@@ -177,7 +177,7 @@ if __name__ == '__main__':
 	x_testing = K_mol[te_idx, :][:, tr_idx]
 	y_training = interaction_matrix[tr_idx, :]
 	y_testing = interaction_matrix[te_idx, :]
-	disimilarities = calculate_disimilarity(x_training, y_training, leaveout)
+	#disimilarities = calculate_disimilarity(x_training, y_training, leaveout)
 	prediction, final_model = make_prediction(x_training, y_training, x_testing, disimilarities, leaveout)
 
 	results = {
