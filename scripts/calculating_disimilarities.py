@@ -104,7 +104,7 @@ def calculate_disimilarity(x, y, printed, test_size=0.1, ):
 	return disimilarity_matrix
 
 
-def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix, leaveout):
+def make_prediction(x_tr, y_tr, x_te, y_te, disimilarity_matrix, leaveout):
 	'''
 	Trains a model according to the disimilarity between the task.
 	:param x_tr: A kernel for the training data.
@@ -148,7 +148,8 @@ def make_prediction(x_tr, y_tr, x_te, disimilarity_matrix, leaveout):
 
 	y_pred = model.predict(multitask_kernel_te)
 	# Reshape the matrix as (n_te, T) array.
-	return y_pred.reshape((x_te.shape[0], y_tr.shape[1])), model
+
+	return y_pred.reshape(y_te.shape), model
 
 
 if __name__ == '__main__':
@@ -178,7 +179,7 @@ if __name__ == '__main__':
 	y_training = interaction_matrix[tr_idx, :]
 	y_testing = interaction_matrix[te_idx, :]
 	disimilarities = calculate_disimilarity(x_training, y_training, leaveout)
-	prediction, final_model = make_prediction(x_training, y_training, x_testing, disimilarities, leaveout)
+	prediction, final_model = make_prediction(x_training, y_training, x_testing, y_testing, disimilarities, leaveout)
 
 	results = {
 		'prediction': (prediction, y_testing),
