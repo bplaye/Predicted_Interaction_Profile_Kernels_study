@@ -147,9 +147,11 @@ def make_prediction(x_tr, y_tr, x_te, y_te, disimilarity_matrix, leaveout):
 	sys.stdout.flush()
 
 	y_pred = model.predict_proba(multitask_kernel_te)
+	class_0 = y_pred[:,0]
+	class_1 = y_pred[:,1]
 	# Reshape the matrix as (n_te, T) array.
 
-	return y_pred.reshape(y_te.shape), model
+	return class_0.reshape(y_te.shape[0],y_tr.shape[1]), class_1.reshape(y_te.shape[0],y_tr.shape[1]), model
 
 
 if __name__ == '__main__':
@@ -179,10 +181,10 @@ if __name__ == '__main__':
 	y_training = interaction_matrix[tr_idx, :]
 	y_testing = interaction_matrix[te_idx, :]
 	disimilarities = calculate_disimilarity(x_training, y_training, leaveout)
-	prediction, final_model = make_prediction(x_training, y_training, x_testing, y_testing, disimilarities, leaveout)
+	class_0, class_1, final_model = make_prediction(x_training, y_training, x_testing, y_testing, disimilarities, leaveout)
 
 	results = {
-		'prediction': (prediction, y_testing),
+		'prediction': (class_0, class_1, y_testing),
 		'model': final_model,
 		'fold': (tr_idx, te_idx),
 		'disimilarity': disimilarities,
