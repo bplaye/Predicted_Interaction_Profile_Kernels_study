@@ -7,7 +7,8 @@ import sys
 from sklearn.cross_validation import train_test_split, KFold, LeaveOneOut
 from sklearn.svm import SVC
 from sklearn.metrics import zero_one_loss
-from sklearn.metrics.pairwise import linear_kernel
+from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.cross_validation import StratifiedKFold
 
 from load_dataset import load_dataset
 
@@ -68,8 +69,10 @@ def calculate_disimilarity(x, y, printed, test_size=0.1, ):
 		if np.unique(y_tr_task).size == 1:
 			continue
 		index = np.arange(y_tr_task.size)
-		selected = y_tr_task == 1
-		id_neg = np.random.choice(index[y_tr_task != 1], size=np.sum(selected), replace=False)
+		pos_train = y_tr_task == 1
+		selected =  y_tr_task == 1
+		distances = np.max(x_tr[:,selected], axis=1)
+		id_neg = np.random.choice(index[y_tr_task != 1], size=np.sum(selected), replace=False, p=distances[y_tr_task != 1])
 		selected[id_neg] = True
 		selected_indices.append(selected)
 		model = SVC(kernel='precomputed', )
@@ -79,10 +82,21 @@ def calculate_disimilarity(x, y, printed, test_size=0.1, ):
 		preds.append(pred)
 		models.append(model)
 
+	selected_te = y_te == 1
+	for t in range(n_tasks):
+		distances = np.max(x_te[:, pos_train], axis=1)
+		s = np.random.choice(np.arange(y_te.shape[0])[y_te[:, t]!=1], replace=False, p = distances[y_te[:,t]!=1])
+		selected_te[s, t] = True
 	# Create an array of the predictions, with each prediction in a column
 	preds = np.array(preds).T
+
+	losses = np.zeros((n_tasks, len(preds)))
+	for p in range(len(preds)):
+		zero_one_loss = preds[:, p][:, None] == y_te
+		for t in range(n_tasks):
+			losses[t, p] = np.mean(zero_one_loss[selected[:, t], t])
 	# calculate losses by calculaten the difference between each prediction and eact task target array
-	losses = np.mean((preds[:, None, :] == y_te[:, :, None]).astype(np.float32), axis=0)
+	# losses = np.mean((preds[:, None, :] == y_te[:, :, None]).astype(np.float32), axis=0)
 	# Calculate the distances betweeen losses from the same task and calculate the maximum for each task
 	disimilarity_matrix = np.max(np.abs(losses[None, :, :] - losses[:, None, :]), axis=2)
 
@@ -113,45 +127,65 @@ def make_prediction(x_tr, y_tr, x_te, y_te, disimilarity_matrix, leaveout):
 	:param disimilarity_matrix: The disimilarity matrix between the tasks.
 	:return: Return an array containing the predictions, and the final models.
 	'''
-	# Calculate task kernel
-	print("Training Task Kernek {}".format(leaveout))
-	sys.stdout.flush()
-	task_kernel = linear_kernel(disimilarity_matrix)
-	sys.stdout.flush()
-	print("Finished Task Kernek {}".format(leaveout))
-	# Train the model
 
+	gamma_values = np.arange(start=1,stop=16, step=2)/100.0
+	scores = np.zeros((3, gamma_values.size))
 	non_zero = np.argwhere(y_tr == 1)
 	zero = np.argwhere(y_tr != 1)
 	zero = zero[np.random.choice(np.arange(zero.shape[0]), size=non_zero.shape[0]), :]
 	selected = np.concatenate((non_zero, zero), axis=0)
 	final_y_tr = np.array([y_tr[i, j] for i, j in selected])
+	cv_i = -1
+	for train,test in StratifiedKFold(final_y_tr.flatten()):
+		cv_i += 1
+		for g_i in range(gamma_values.size):
+			# Calculate task kernel
+			print("Training Task Kernek {}: {}".format(leaveout,g_i))
+			sys.stdout.flush()
+			task_kernel = rbf_kernel(disimilarity_matrix, gamma=gamma_values[g_i])
+			print("Finished Task Kernek {}: {}".format(leaveout,g_i))
+			# Train the model
 
-	print("Creating Multitask Matrix {}".format(leaveout))
-	sys.stdout.flush()
-	multitask_kernel_tr = np.zeros((selected.shape[0], selected.shape[0]), dtype=np.float32)
-	print("Filling Multitask Matrix {}".format(leaveout))
-	sys.stdout.flush()
-	multitask_kernel_tr = x_tr[selected[:, 0], :][:, selected[:, 0]] * task_kernel[selected[:, 1], :][:, selected[:, 1]]
+
+			print("Creating Multitask Matrix {}: {}".format(leaveout,g_i))
+			sys.stdout.flush()
+			multitask_kernel_tr = np.zeros((selected.shape[0], selected.shape[0]), dtype=np.float32)
+
+			print("Filling Multitask Matrix {}: {}".format(leaveout,g_i))
+			sys.stdout.flush()
+			multitask_kernel_tr = x_tr[selected[:, 0], :][:, selected[:, 0]] * task_kernel[selected[:, 1], :][:, selected[:, 1]]
+
+			print("Training SVM {}: {}".format(leaveout,g_i))
+			sys.stdout.flush()
+
+
+			model = SVC(kernel='precomputed', probability=True)
+			model.fit(multitask_kernel_tr[train,:][:,train], final_y_tr[train])
+			# Predict
+
+			scores[cv_i, g_i] = model.score(multitask_kernel_tr[test,:][:,train], final_y_tr[test])
+
+			print("Predicting SVM {}: {}".format(leaveout,g_i))
+			sys.stdout.flush()
+
+	max_gamma_i = np.argmax(np.mean(scores,axis=0))
+
+	task_kernel = rbf_kernel(disimilarity_matrix, gamma=gamma_values[max_gamma_i])
+
+	model = SVC(kernel='precomputed', probability=True)
+	model.fit(multitask_kernel_tr, final_y_tr)
+
 	print("Test MultiTask Kernel {}".format(leaveout))
 	sys.stdout.flush()
 	multitask_kernel_te = np.tile(x_te[:, selected[:, 0]], (task_kernel.shape[1], 1)) * \
 	                      np.repeat(task_kernel[:, selected[:, 1]], x_te.shape[0], axis=0)
 
-	print("Training SVM {}".format(leaveout))
-	sys.stdout.flush()
-	model = SVC(kernel='precomputed', probability=True)
-	model.fit(multitask_kernel_tr, final_y_tr)
-	# Predict
-	print("Predicting SVM {}".format(leaveout))
-	sys.stdout.flush()
-
 	y_pred = model.predict_proba(multitask_kernel_te)
-	class_0 = y_pred[:,0]
-	class_1 = y_pred[:,1]
+	class_0 = y_pred[:, 0]
+	class_1 = y_pred[:, 1]
 	# Reshape the matrix as (n_te, T) array.
 
-	return class_0.reshape(y_te.shape[0],y_tr.shape[1]), class_1.reshape(y_te.shape[0],y_tr.shape[1]), model
+	return class_0.reshape(y_te.shape[0],y_tr.shape[1]), class_1.reshape(y_te.shape[0],y_tr.shape[1]), model, gamma_values[max_gamma_i]
 
 
 if __name__ == '__main__':
@@ -181,13 +215,14 @@ if __name__ == '__main__':
 	y_training = interaction_matrix[tr_idx, :]
 	y_testing = interaction_matrix[te_idx, :]
 	disimilarities = calculate_disimilarity(x_training, y_training, leaveout)
-	class_0, class_1, final_model = make_prediction(x_training, y_training, x_testing, y_testing, disimilarities, leaveout)
+	class_0, class_1, final_model, gamma = make_prediction(x_training, y_training, x_testing, y_testing, disimilarities, leaveout)
 
 	results = {
 		'prediction': (class_0, class_1, y_testing),
 		'model': final_model,
 		'fold': (tr_idx, te_idx),
 		'disimilarity': disimilarities,
+		'gamma': gamma,
 	}
 
 	with open(output_filename, 'wb') as f:
